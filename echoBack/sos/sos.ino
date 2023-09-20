@@ -26,4 +26,5 @@ void loop() {
     sos_s();
     sos_o();
     sos_s();
+    delay(1000);
 }
