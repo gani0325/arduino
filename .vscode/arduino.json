@@ -1,5 +1,5 @@
 {
-    "sketch": "test\\test.ino",
+    "sketch": "WithoutDS18B20\\WithoutDS18B20.ino",
     "board": "arduino:avr:uno",
     "port": "COM3"
 }
