@@ -1,143 +1,167 @@
-#include <DallasTemperature.h>
-int temper = 2;
+// Pin connected to the DS18B20 sensor
+const int ds18b20Pin = 2; // Replace with your actual pin number
 
 void setup()
 {
-    pinMode(temper, OUTPUT);
     Serial.begin(9600);
 }
 
-int Initialization()
+void loop()
 {
-    int existence;
+    goto MEAS;
+    Serial.print("Serial Number: ");
 
-    noInterrupts();
-    // master reset pulse
-    pinMode(temper, OUTPUT);
-    digitalWrite(temper, LOW);
-
-    delayMicroseconds(500);
-
-    // ready to operate
-    pinMode(temper, INPUT);
-    delayMicroseconds(60);
-
-    existence = digitalRead(temper);
-
-    if (existence == 0)
+    // Reset the 1-Wire bus
+    if (!resetSensor())
     {
-        interrupts();
-        // reset true
-        return 0;
+        Serial.println("No DS18B20 detected.");
+        delay(1000);
+        return;
+    }
+
+    // Send command to read ROM
+    sendCommand(0x33); // Read ROM command
+
+    // Read the 64-bit ROM code
+    for (int i = 0; i < 8; i++)
+    {
+        byte byteRead = readByte();
+        Serial.print(byteRead, HEX);
+        if (i < 7)
+            Serial.print('-'); // Print a dash between bytes
+    }
+
+
+MEAS:
+    if (!resetSensor())
+    {
+        Serial.println("No DS18B20 detected.");
+        delay(1000);
+        return;
+    }
+    sendCommand(0xCC);
+    sendCommand(0x44); // STARTCONVO
+    delay(950);
+
+    if (!resetSensor())
+    {
+        Serial.println("No DS18B20 detected.");
+        delay(1000);
+        return;
+    }
+    sendCommand(0xCC);
+    sendCommand(0xBE);
+
+
+
+
+// Read the 64-bit ROM code
+    for (int i = 0; i < 9; i++)
+    {
+        byte byteRead = readByte();
+        Serial.print(byteRead, HEX);
+        if (i < 7)
+            Serial.print('-'); // Print a dash between bytes
+    }
+    Serial.println();
+
+/*
+    int16_t temperatureData = readTemperature();
+
+    float temperatureCelsius = temperatureData / 16.0;
+
+    Serial.print(temperatureCelsius);
+    Serial.println(" °C");
+**/
+}
+
+bool resetSensor()
+{
+    // Pull the data line low for a reset pulse
+
+    digitalWrite(ds18b20Pin, LOW);
+    pinMode(ds18b20Pin, OUTPUT);
+
+    delayMicroseconds(480); // Hold for 480us
+    pinMode(ds18b20Pin, INPUT);
+    delayMicroseconds(100); // Wait for DS18B20 to respond
+
+    // Check if the DS18B20 pulled the line low (presence pulse)
+    if (digitalRead(ds18b20Pin) == LOW)
+    {
+        delayMicroseconds(380); // Wait for presence pulse to end
+        // Serial.println("Reset OK\n");
+        return true;
     }
     else
     {
-        interrupts();
-        // reset false
-        return 1;
+        // Serial.println("Reset NG\n");
+        return false; // No DS18B20 detected
     }
 }
 
-// ROM Command Read
-uint8_t ReadByte() {
-    uint8_t     data = 0;
-    int         i;
- 
-    for (i=0; i<8; i++)
-    {
-        data |= MasterRead() << i;
-    }
-    return data;
-}
-
-uint8_t MasterRead()
+void skip()
 {
-    byte data = 0x00;
-
-    for (int i = 0; i < 8; i++)
-    {
-
-        pinMode(temper, OUTPUT);
-        digitalWrite(temper, LOW);
-        delayMicroseconds(3);
-
-        pinMode(temper, INPUT);
-        digitalWrite(temper, HIGH);
-        delayMicroseconds(10);
-
-        temper |= 1;
-        temper &= ~1;
-
-        digitalRead(temper);
-        
-        data |= temper << i;
-
-        
-        interrupts();
-        delayMicroseconds(50);
-    }
-    return data;
 }
-
-// ROM Command Write
-void MasterWrite(unsigned char data)
+void sendCommand(byte cmd)
 {
     for (int i = 0; i < 8; i++)
-    {   
-        // write 1
-        if (data & 1)
+    {
+        delayMicroseconds(10); // Write 0 bit
+        if (bitRead(cmd, i))
         {
             noInterrupts();
-
-            pinMode(temper, OUTPUT);
-            digitalWrite(temper, LOW);
+            digitalWrite(ds18b20Pin, LOW);
+            pinMode(ds18b20Pin, OUTPUT);
             delayMicroseconds(10);
 
-            digitalWrite(temper, HIGH);
+            digitalWrite(ds18b20Pin, HIGH);
             interrupts();
             delayMicroseconds(55);
         }
-        // write 0
         else
         {
             noInterrupts();
-
-            pinMode(temper, OUTPUT);
-            digitalWrite(temper, LOW);
+            digitalWrite(ds18b20Pin, LOW);
+            pinMode(ds18b20Pin, OUTPUT);
             delayMicroseconds(65);
-
-            digitalWrite(temper, HIGH);
-
+            digitalWrite(ds18b20Pin, HIGH);
             interrupts();
             delayMicroseconds(5);
         }
-        data >> 1;
+        // delayMicroseconds(1);       // Recovery time between bits
+        // pinMode(ds18b20Pin, INPUT); // Release the data line
     }
 }
 
-
-void loop()
+byte readByte()
 {
-    int i;
-    char result;
-
-    // Step 1. Initialization
-    i = Initialization();
-
-    // reset 이 true 이면
-    if (i == 0)
+    byte byteRead = 0;
+    for (int i = 0; i < 8; i++)
     {
-        // Step 2. ROM Command (followed by any required data exchange)
-        MasterWrite(0x33);
-    
-        // int data = MasterRead();
-        // // Step 3. DS18B20 Function Command (followed by any required data exchange)
-        // FuncCommand(0x33); // '0x33'
 
-        for (int i = 0; i < 8; i++) {
-            byte result = MasterRead();
-            Serial.print(result, HEX);
-        }
-        Serial.println();
+        noInterrupts();
+        pinMode(ds18b20Pin, OUTPUT);
+        digitalWrite(ds18b20Pin, LOW);
+        delayMicroseconds(3);
+
+        pinMode(ds18b20Pin, INPUT);
+        delayMicroseconds(10);
+        byteRead |= (digitalRead(ds18b20Pin) << i);
+        interrupts();
+        delayMicroseconds(53);
     }
+    return byteRead;
+}
+
+int16_t readTemperature()
+{
+    // Read two bytes of temperature data
+    byte lowByte = readByte();
+    byte highByte = readByte();
+
+    // Combine the two bytes into a 16-bit integer
+    int16_t temperatureData = (highByte << 8) | lowByte;
+
+    return temperatureData;
 }
