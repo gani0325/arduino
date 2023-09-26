@@ -1,19 +1,19 @@
-int led = 13;
+#include "blinkLED.h"
+const int firstLedPin  = 13; // choose the pin for each of the LEDs
+const int secondLedPin = 5;
+const int thirdLedPin  = 6;
 
-void setup() {
-  // put your setup code here, to run once:
-  pinMode(led, OUTPUT);
-  Serial.begin(9600);
+void setup()
+{
+  pinMode(firstLedPin, OUTPUT);  // declare LED pins as output
+  pinMode(secondLedPin, OUTPUT); // declare LED pins as output
+  pinMode(thirdLedPin, OUTPUT);  // declare LED pins as output
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  digitalWrite(led, LOW);
-  Serial.write("OFF\n");
-  delay(1000);
-
-  digitalWrite(led, HIGH);
-  Serial.write("ON\n");
-  delay(1000);
+void loop()
+{
+  // flash each of the LEDs for 1000 milliseconds (1 second)
+  blinkLED(firstLedPin,  1000);
+  blinkLED(secondLedPin, 1000);
+  blinkLED(thirdLedPin,  1000);
 }
-
